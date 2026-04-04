@@ -1,18 +1,27 @@
 let inventoryData = [];
 
-// Daily key
+// Daily key for sessionStorage
 const todayKey = "inventory_" + new Date().toLocaleDateString();
 
-// Load data
+// Simple encryption/decryption helper (use a proper library for production)
+const encryptData = (data) => btoa(JSON.stringify(data));
+const decryptData = (data) => JSON.parse(atob(data));
+
+// Load existing data
 window.onload = function () {
-    const savedData = localStorage.getItem(todayKey);
+    const savedData = sessionStorage.getItem(todayKey);
     if (savedData) {
-        inventoryData = JSON.parse(savedData);
-        renderTable();
+        try {
+            inventoryData = decryptData(savedData);
+            renderTable();
+        } catch (e) {
+            console.error("Failed to load data:", e);
+            inventoryData = [];
+        }
     }
 };
 
-// Add Item
+// Add item
 function addItem() {
     const name = document.getElementById("itemName").value;
     const type = document.getElementById("itemType").value;
@@ -45,9 +54,13 @@ function addItem() {
     clearInputs();
 }
 
-// Save data
+// Save to sessionStorage
 function saveData() {
-    localStorage.setItem(todayKey, JSON.stringify(inventoryData));
+    try {
+        sessionStorage.setItem(todayKey, encryptData(inventoryData));
+    } catch (e) {
+        console.error("Failed to save data:", e);
+    }
 }
 
 // Render table
@@ -63,7 +76,6 @@ function renderTable() {
         row.insertCell(2).innerText = item.stock;
         row.insertCell(3).innerText = item.system;
 
-        // Editable Sold field
         const soldCell = row.insertCell(4);
         const soldInput = document.createElement("input");
         soldInput.type = "number";
@@ -80,22 +92,16 @@ function renderTable() {
 
         if (item.sold < 0) row.classList.add("error");
 
-        // Edit button
         const editCell = row.insertCell(7);
         const editBtn = document.createElement("button");
         editBtn.innerText = "Edit";
-        editBtn.onclick = function () {
-            editItem(index);
-        };
+        editBtn.onclick = function () { editItem(index); };
         editCell.appendChild(editBtn);
 
-        // Delete button
         const deleteCell = row.insertCell(8);
         const deleteBtn = document.createElement("button");
         deleteBtn.innerText = "Delete";
-        deleteBtn.onclick = function () {
-            deleteItem(index);
-        };
+        deleteBtn.onclick = function () { deleteItem(index); };
         deleteCell.appendChild(deleteBtn);
     });
 
@@ -107,14 +113,7 @@ function updateTotal() {
     document.getElementById("totalSold").innerText = total;
 }
 
-// Delete
-function deleteItem(index) {
-    inventoryData.splice(index, 1);
-    saveData();
-    renderTable();
-}
-
-// Edit
+// Edit item
 function editItem(index) {
     const item = inventoryData[index];
     document.getElementById("itemName").value = item.name;
@@ -123,6 +122,13 @@ function editItem(index) {
     document.getElementById("systemQty").value = item.system;
     document.getElementById("soldQty").value = item.sold;
 
+    inventoryData.splice(index, 1);
+    saveData();
+    renderTable();
+}
+
+// Delete item
+function deleteItem(index) {
     inventoryData.splice(index, 1);
     saveData();
     renderTable();
