@@ -1,3 +1,16 @@
+let inventoryData = [];
+
+// Load saved data
+window.onload = function () {
+    const savedData = localStorage.getItem("inventory");
+
+    if (savedData) {
+        inventoryData = JSON.parse(savedData);
+        renderTable();
+    }
+};
+
+// Add Item
 function addItem() {
     const name = document.getElementById("itemName").value;
     const stock = parseInt(document.getElementById("stockQty").value);
@@ -9,32 +22,105 @@ function addItem() {
     }
 
     const sold = stock - system;
-
     const now = new Date();
-    const date = now.toLocaleDateString();
-    const time = now.toLocaleTimeString();
 
-    const table = document
-        .getElementById("inventoryTable")
-        .getElementsByTagName("tbody")[0];
+    const item = {
+        name,
+        stock,
+        system,
+        sold,
+        date: now.toLocaleDateString(),
+        time: now.toLocaleTimeString()
+    };
 
-    const row = table.insertRow();
+    inventoryData.push(item);
 
-    row.insertCell(0).innerText = name;
-    row.insertCell(1).innerText = stock;
-    row.insertCell(2).innerText = system;
-    row.insertCell(3).innerText = sold;
-    row.insertCell(4).innerText = date;
-    row.insertCell(5).innerText = time;
-
-    // Highlight if something is wrong
-    if (sold < 0) {
-        row.classList.add("error");
-    }
-
+    saveData();
+    renderTable();
     clearInputs();
 }
 
+// Save data
+function saveData() {
+    localStorage.setItem("inventory", JSON.stringify(inventoryData));
+}
+
+// Render table
+function renderTable() {
+    const tableBody = document
+        .getElementById("inventoryTable")
+        .getElementsByTagName("tbody")[0];
+
+    tableBody.innerHTML = "";
+
+    let totalSold = 0;
+
+    inventoryData.forEach((item, index) => {
+        const row = tableBody.insertRow();
+
+        row.insertCell(0).innerText = item.name;
+        row.insertCell(1).innerText = item.stock;
+        row.insertCell(2).innerText = item.system;
+        row.insertCell(3).innerText = item.sold;
+        row.insertCell(4).innerText = item.date;
+        row.insertCell(5).innerText = item.time;
+
+        totalSold += item.sold;
+
+        if (item.sold < 0) row.classList.add("error");
+
+        // Edit button
+        const editCell = row.insertCell(6);
+        const editBtn = document.createElement("button");
+        editBtn.innerText = "Edit";
+        editBtn.onclick = function () {
+            editItem(index);
+        };
+        editCell.appendChild(editBtn);
+
+        // Delete button
+        const deleteCell = row.insertCell(7);
+        const deleteBtn = document.createElement("button");
+        deleteBtn.innerText = "Delete";
+        deleteBtn.onclick = function () {
+            deleteItem(index);
+        };
+        deleteCell.appendChild(deleteBtn);
+    });
+
+    document.getElementById("totalSold").innerText = totalSold;
+}
+
+// Delete
+function deleteItem(index) {
+    inventoryData.splice(index, 1);
+    saveData();
+    renderTable();
+}
+
+// Edit
+function editItem(index) {
+    const item = inventoryData[index];
+
+    document.getElementById("itemName").value = item.name;
+    document.getElementById("stockQty").value = item.stock;
+    document.getElementById("systemQty").value = item.system;
+
+    inventoryData.splice(index, 1);
+    saveData();
+    renderTable();
+}
+
+// Clear all
+function clearAll() {
+    if (confirm("Are you sure you want to clear all data?")) {
+        inventoryData = [];
+        saveData();
+        renderTable();
+    }
+}
+
+// Clear inputs
 function clearInputs() {
     document.getElementById("itemName").value = "";
     document.getElementById("stockQty").value = "";
