@@ -1,27 +1,14 @@
 let inventoryData = [];
-
-// Daily key for sessionStorage
 const todayKey = "inventory_" + new Date().toLocaleDateString();
 
-// Simple encryption/decryption helper (use a proper library for production)
-const encryptData = (data) => btoa(JSON.stringify(data));
-const decryptData = (data) => JSON.parse(atob(data));
-
-// Load existing data
 window.onload = function () {
     const savedData = sessionStorage.getItem(todayKey);
     if (savedData) {
-        try {
-            inventoryData = decryptData(savedData);
-            renderTable();
-        } catch (e) {
-            console.error("Failed to load data:", e);
-            inventoryData = [];
-        }
+        inventoryData = JSON.parse(savedData);
+        renderTable();
     }
 };
 
-// Add item
 function addItem() {
     const name = document.getElementById("itemName").value;
     const type = document.getElementById("itemType").value;
@@ -54,16 +41,10 @@ function addItem() {
     clearInputs();
 }
 
-// Save to sessionStorage
 function saveData() {
-    try {
-        sessionStorage.setItem(todayKey, encryptData(inventoryData));
-    } catch (e) {
-        console.error("Failed to save data:", e);
-    }
+    sessionStorage.setItem(todayKey, JSON.stringify(inventoryData));
 }
 
-// Render table
 function renderTable() {
     const tableBody = document.getElementById("inventoryTable").getElementsByTagName("tbody")[0];
     tableBody.innerHTML = "";
@@ -84,13 +65,14 @@ function renderTable() {
             item.sold = parseInt(this.value);
             saveData();
             updateTotal();
+            renderCurrentStock();
         };
         soldCell.appendChild(soldInput);
 
         row.insertCell(5).innerText = item.date;
         row.insertCell(6).innerText = item.time;
 
-        if (item.sold < 0) row.classList.add("error");
+        if (item.sold < 0 || item.stock !== item.system) row.classList.add("error");
 
         const editCell = row.insertCell(7);
         const editBtn = document.createElement("button");
@@ -106,6 +88,7 @@ function renderTable() {
     });
 
     updateTotal();
+    renderCurrentStock();
 }
 
 function updateTotal() {
@@ -113,7 +96,6 @@ function updateTotal() {
     document.getElementById("totalSold").innerText = total;
 }
 
-// Edit item
 function editItem(index) {
     const item = inventoryData[index];
     document.getElementById("itemName").value = item.name;
@@ -127,14 +109,12 @@ function editItem(index) {
     renderTable();
 }
 
-// Delete item
 function deleteItem(index) {
     inventoryData.splice(index, 1);
     saveData();
     renderTable();
 }
 
-// Clear all
 function clearAll() {
     if (confirm("Are you sure you want to clear all data for today?")) {
         inventoryData = [];
@@ -143,11 +123,23 @@ function clearAll() {
     }
 }
 
-// Clear inputs
 function clearInputs() {
     document.getElementById("itemName").value = "";
     document.getElementById("itemType").value = "";
     document.getElementById("stockQty").value = "";
     document.getElementById("systemQty").value = "";
     document.getElementById("soldQty").value = "";
+}
+
+function renderCurrentStock() {
+    const tableBody = document.getElementById("currentStockTable").getElementsByTagName("tbody")[0];
+    tableBody.innerHTML = "";
+
+    inventoryData.forEach(item => {
+        const row = tableBody.insertRow();
+        row.insertCell(0).innerText = item.name;
+        row.insertCell(1).innerText = item.system;
+        row.insertCell(2).innerText = item.sold;
+        row.insertCell(3).innerText = item.system - item.sold;
+    });
 }
