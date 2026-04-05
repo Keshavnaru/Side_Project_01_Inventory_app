@@ -2,88 +2,105 @@
 const MASTER_KEY = "items_master";
 const LOG_KEY = "inventory_logs";
 
-let masterItems = [];
-let logs = [];
+// Daily key for sessionStorage
+const todayKey = "inventory_" + new Date().toLocaleDateString();
 
+// Simple encryption/decryption helper (use a proper library for production)
+const encryptData = (data) => btoa(JSON.stringify(data));
+const decryptData = (data) => JSON.parse(atob(data));
+
+// Load existing data
 window.onload = function () {
-    masterItems = JSON.parse(localStorage.getItem(MASTER_KEY)) || [];
-    logs = JSON.parse(localStorage.getItem(LOG_KEY)) || [];
-
-    renderMaster();
-    populateDropdown();
-    renderInventory();
+    const savedData = sessionStorage.getItem(todayKey);
+    if (savedData) {
+        try {
+            inventoryData = decryptData(savedData);
+            renderTable();
+        } catch (e) {
+            console.error("Failed to load data:", e);
+            inventoryData = [];
+        }
+    }
 };
 
-// 🔹 ADD PERMANENT ITEM
-function addMasterItem() {
-    const name = document.getElementById("newItemName").value;
-    const type = document.getElementById("newItemType").value;
-
-    if (!name || !type) return alert("Fill all fields");
-
-    masterItems.push({ name, type });
-    localStorage.setItem(MASTER_KEY, JSON.stringify(masterItems));
-
-    renderMaster();
-    populateDropdown();
-}
-
-// 🔹 POPULATE DROPDOWN
-function populateDropdown() {
-    const select = document.getElementById("itemSelect");
-    select.innerHTML = "";
-
-    masterItems.forEach((item, i) => {
-        const option = document.createElement("option");
-        option.value = i;
-        option.text = item.name + " (" + item.type + ")";
-        select.appendChild(option);
-    });
-}
-
-// 🔹 ADD DAILY INVENTORY
-function addInventory() {
-    const index = document.getElementById("itemSelect").value;
+// Add item
+function addItem() {
+    const name = document.getElementById("itemName").value;
+    const type = document.getElementById("itemType").value;
     const stock = parseInt(document.getElementById("stockQty").value);
     const system = parseInt(document.getElementById("systemQty").value);
-    const sold = parseInt(document.getElementById("soldQty").value) || 0;
+    let sold = parseInt(document.getElementById("soldQty").value);
+
+    if (!name || !type || isNaN(stock) || isNaN(system)) {
+        alert("Please fill all required fields correctly");
+        return;
+    }
+
+    if (isNaN(sold)) sold = stock - system;
 
     const item = masterItems[index];
 
-    const entry = {
-        name: item.name,
-        type: item.type,
+    const item = {
+        name,
+        type,
         stock,
         system,
         sold,
         date: new Date().toLocaleDateString()
     };
 
-    logs.push(entry);
-    localStorage.setItem(LOG_KEY, JSON.stringify(logs));
-
-    renderInventory();
+    inventoryData.push(item);
+    saveData();
+    renderTable();
+    clearInputs();
 }
 
-// 🔹 SHOW TODAY ONLY
-function renderInventory() {
-    const tbody = document.querySelector("#inventoryTable tbody");
-    tbody.innerHTML = "";
+// Save to sessionStorage
+function saveData() {
+    try {
+        sessionStorage.setItem(todayKey, encryptData(inventoryData));
+    } catch (e) {
+        console.error("Failed to save data:", e);
+    }
+}
 
     const today = new Date().toLocaleDateString();
 
-    logs.filter(l => l.date === today).forEach((item, i) => {
-        const row = tbody.insertRow();
+    inventoryData.forEach((item, index) => {
+        const row = tableBody.insertRow();
 
         row.insertCell(0).innerText = item.name;
         row.insertCell(1).innerText = item.type;
         row.insertCell(2).innerText = item.stock;
         row.insertCell(3).innerText = item.system;
-        row.insertCell(4).innerText = item.sold;
-        row.insertCell(5).innerText = item.date;
 
-        const del = row.insertCell(6);
-        del.innerHTML = `<button onclick="deleteLog(${i})">Delete</button>`;
+        const soldCell = row.insertCell(4);
+        const soldInput = document.createElement("input");
+        soldInput.type = "number";
+        soldInput.value = item.sold;
+        soldInput.onchange = function() {
+            item.sold = parseInt(this.value);
+            saveData();
+            updateTotal();
+        };
+        soldCell.appendChild(soldInput);
+
+        row.insertCell(5).innerText = item.date;
+        row.insertCell(6).innerText = item.time;
+
+        if (item.sold < 0) row.classList.add("error");
+
+        const editCell = row.insertCell(7);
+        const editBtn = document.createElement("button");
+        editBtn.innerText = "Edit";
+        editBtn.onclick = function () { editItem(index); };
+        editCell.appendChild(editBtn);
+
+        const deleteCell = row.insertCell(8);
+        const deleteBtn = document.createElement("button");
+        deleteBtn.innerText = "Delete";
+        deleteBtn.onclick = function () { deleteItem(index); };
+        deleteCell.appendChild(deleteBtn);
     });
 }
 
@@ -94,26 +111,39 @@ function deleteLog(i) {
     renderInventory();
 }
 
-// 🔹 MASTER TABLE
-function renderMaster() {
-    const tbody = document.querySelector("#masterTable tbody");
-    tbody.innerHTML = "";
-
-    masterItems.forEach((item, i) => {
-        const row = tbody.insertRow();
+// Edit item
+function editItem(index) {
+    const item = inventoryData[index];
+    document.getElementById("itemName").value = item.name;
+    document.getElementById("itemType").value = item.type;
+    document.getElementById("stockQty").value = item.stock;
+    document.getElementById("systemQty").value = item.system;
+    document.getElementById("soldQty").value = item.sold;
 
         row.insertCell(0).innerText = item.name;
         row.insertCell(1).innerText = item.type;
 
-        const del = row.insertCell(2);
-        del.innerHTML = `<button onclick="deleteMaster(${i})">Delete</button>`;
-    });
+// Delete item
+function deleteItem(index) {
+    inventoryData.splice(index, 1);
+    saveData();
+    renderTable();
 }
 
-// 🔹 DELETE MASTER ITEM
-function deleteMaster(i) {
-    masterItems.splice(i, 1);
-    localStorage.setItem(MASTER_KEY, JSON.stringify(masterItems));
-    renderMaster();
-    populateDropdown();
+// Clear all
+function clearAll() {
+    if (confirm("Are you sure you want to clear all data for today?")) {
+        inventoryData = [];
+        saveData();
+        renderTable();
+    }
+}
+
+// Clear inputs
+function clearInputs() {
+    document.getElementById("itemName").value = "";
+    document.getElementById("itemType").value = "";
+    document.getElementById("stockQty").value = "";
+    document.getElementById("systemQty").value = "";
+    document.getElementById("soldQty").value = "";
 }
