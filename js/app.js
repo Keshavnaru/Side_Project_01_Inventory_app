@@ -1,4 +1,6 @@
-let inventoryData = [];
+// STORAGE KEYS
+const MASTER_KEY = "items_master";
+const LOG_KEY = "inventory_logs";
 
 // Daily key for sessionStorage
 const todayKey = "inventory_" + new Date().toLocaleDateString();
@@ -36,7 +38,7 @@ function addItem() {
 
     if (isNaN(sold)) sold = stock - system;
 
-    const now = new Date();
+    const item = masterItems[index];
 
     const item = {
         name,
@@ -44,8 +46,7 @@ function addItem() {
         stock,
         system,
         sold,
-        date: now.toLocaleDateString(),
-        time: now.toLocaleTimeString()
+        date: new Date().toLocaleDateString()
     };
 
     inventoryData.push(item);
@@ -63,10 +64,7 @@ function saveData() {
     }
 }
 
-// Render table
-function renderTable() {
-    const tableBody = document.getElementById("inventoryTable").getElementsByTagName("tbody")[0];
-    tableBody.innerHTML = "";
+    const today = new Date().toLocaleDateString();
 
     inventoryData.forEach((item, index) => {
         const row = tableBody.insertRow();
@@ -104,13 +102,13 @@ function renderTable() {
         deleteBtn.onclick = function () { deleteItem(index); };
         deleteCell.appendChild(deleteBtn);
     });
-
-    updateTotal();
 }
 
-function updateTotal() {
-    let total = inventoryData.reduce((sum, item) => sum + item.sold, 0);
-    document.getElementById("totalSold").innerText = total;
+// 🔹 DELETE LOG
+function deleteLog(i) {
+    logs.splice(i, 1);
+    localStorage.setItem(LOG_KEY, JSON.stringify(logs));
+    renderInventory();
 }
 
 // Edit item
@@ -122,10 +120,8 @@ function editItem(index) {
     document.getElementById("systemQty").value = item.system;
     document.getElementById("soldQty").value = item.sold;
 
-    inventoryData.splice(index, 1);
-    saveData();
-    renderTable();
-}
+        row.insertCell(0).innerText = item.name;
+        row.insertCell(1).innerText = item.type;
 
 // Delete item
 function deleteItem(index) {
