@@ -1,145 +1,119 @@
-let inventoryData = [];
-const todayKey = "inventory_" + new Date().toLocaleDateString();
+// STORAGE KEYS
+const MASTER_KEY = "items_master";
+const LOG_KEY = "inventory_logs";
+
+let masterItems = [];
+let logs = [];
 
 window.onload = function () {
-    const savedData = sessionStorage.getItem(todayKey);
-    if (savedData) {
-        inventoryData = JSON.parse(savedData);
-        renderTable();
-    }
+    masterItems = JSON.parse(localStorage.getItem(MASTER_KEY)) || [];
+    logs = JSON.parse(localStorage.getItem(LOG_KEY)) || [];
+
+    renderMaster();
+    populateDropdown();
+    renderInventory();
 };
 
-function addItem() {
-    const name = document.getElementById("itemName").value;
-    const type = document.getElementById("itemType").value;
+// 🔹 ADD PERMANENT ITEM
+function addMasterItem() {
+    const name = document.getElementById("newItemName").value;
+    const type = document.getElementById("newItemType").value;
+
+    if (!name || !type) return alert("Fill all fields");
+
+    masterItems.push({ name, type });
+    localStorage.setItem(MASTER_KEY, JSON.stringify(masterItems));
+
+    renderMaster();
+    populateDropdown();
+}
+
+// 🔹 POPULATE DROPDOWN
+function populateDropdown() {
+    const select = document.getElementById("itemSelect");
+    select.innerHTML = "";
+
+    masterItems.forEach((item, i) => {
+        const option = document.createElement("option");
+        option.value = i;
+        option.text = item.name + " (" + item.type + ")";
+        select.appendChild(option);
+    });
+}
+
+// 🔹 ADD DAILY INVENTORY
+function addInventory() {
+    const index = document.getElementById("itemSelect").value;
     const stock = parseInt(document.getElementById("stockQty").value);
     const system = parseInt(document.getElementById("systemQty").value);
-    let sold = parseInt(document.getElementById("soldQty").value);
+    const sold = parseInt(document.getElementById("soldQty").value) || 0;
 
-    if (!name || !type || isNaN(stock) || isNaN(system)) {
-        alert("Please fill all required fields correctly");
-        return;
-    }
+    const item = masterItems[index];
 
-    if (isNaN(sold)) sold = stock - system;
-
-    const now = new Date();
-
-    const item = {
-        name,
-        type,
+    const entry = {
+        name: item.name,
+        type: item.type,
         stock,
         system,
         sold,
-        date: now.toLocaleDateString(),
-        time: now.toLocaleTimeString()
+        date: new Date().toLocaleDateString()
     };
 
-    inventoryData.push(item);
-    saveData();
-    renderTable();
-    clearInputs();
+    logs.push(entry);
+    localStorage.setItem(LOG_KEY, JSON.stringify(logs));
+
+    renderInventory();
 }
 
-function saveData() {
-    sessionStorage.setItem(todayKey, JSON.stringify(inventoryData));
-}
+// 🔹 SHOW TODAY ONLY
+function renderInventory() {
+    const tbody = document.querySelector("#inventoryTable tbody");
+    tbody.innerHTML = "";
 
-function renderTable() {
-    const tableBody = document.getElementById("inventoryTable").getElementsByTagName("tbody")[0];
-    tableBody.innerHTML = "";
+    const today = new Date().toLocaleDateString();
 
-    inventoryData.forEach((item, index) => {
-        const row = tableBody.insertRow();
+    logs.filter(l => l.date === today).forEach((item, i) => {
+        const row = tbody.insertRow();
 
         row.insertCell(0).innerText = item.name;
         row.insertCell(1).innerText = item.type;
         row.insertCell(2).innerText = item.stock;
         row.insertCell(3).innerText = item.system;
-
-        const soldCell = row.insertCell(4);
-        const soldInput = document.createElement("input");
-        soldInput.type = "number";
-        soldInput.value = item.sold;
-        soldInput.onchange = function() {
-            item.sold = parseInt(this.value);
-            saveData();
-            updateTotal();
-            renderCurrentStock();
-        };
-        soldCell.appendChild(soldInput);
-
+        row.insertCell(4).innerText = item.sold;
         row.insertCell(5).innerText = item.date;
-        row.insertCell(6).innerText = item.time;
 
-        if (item.sold < 0 || item.stock !== item.system) row.classList.add("error");
-
-        const editCell = row.insertCell(7);
-        const editBtn = document.createElement("button");
-        editBtn.innerText = "Edit";
-        editBtn.onclick = function () { editItem(index); };
-        editCell.appendChild(editBtn);
-
-        const deleteCell = row.insertCell(8);
-        const deleteBtn = document.createElement("button");
-        deleteBtn.innerText = "Delete";
-        deleteBtn.onclick = function () { deleteItem(index); };
-        deleteCell.appendChild(deleteBtn);
+        const del = row.insertCell(6);
+        del.innerHTML = `<button onclick="deleteLog(${i})">Delete</button>`;
     });
-
-    updateTotal();
-    renderCurrentStock();
 }
 
-function updateTotal() {
-    let total = inventoryData.reduce((sum, item) => sum + item.sold, 0);
-    document.getElementById("totalSold").innerText = total;
+// 🔹 DELETE LOG
+function deleteLog(i) {
+    logs.splice(i, 1);
+    localStorage.setItem(LOG_KEY, JSON.stringify(logs));
+    renderInventory();
 }
 
-function editItem(index) {
-    const item = inventoryData[index];
-    document.getElementById("itemName").value = item.name;
-    document.getElementById("itemType").value = item.type;
-    document.getElementById("stockQty").value = item.stock;
-    document.getElementById("systemQty").value = item.system;
-    document.getElementById("soldQty").value = item.sold;
+// 🔹 MASTER TABLE
+function renderMaster() {
+    const tbody = document.querySelector("#masterTable tbody");
+    tbody.innerHTML = "";
 
-    inventoryData.splice(index, 1);
-    saveData();
-    renderTable();
-}
+    masterItems.forEach((item, i) => {
+        const row = tbody.insertRow();
 
-function deleteItem(index) {
-    inventoryData.splice(index, 1);
-    saveData();
-    renderTable();
-}
-
-function clearAll() {
-    if (confirm("Are you sure you want to clear all data for today?")) {
-        inventoryData = [];
-        saveData();
-        renderTable();
-    }
-}
-
-function clearInputs() {
-    document.getElementById("itemName").value = "";
-    document.getElementById("itemType").value = "";
-    document.getElementById("stockQty").value = "";
-    document.getElementById("systemQty").value = "";
-    document.getElementById("soldQty").value = "";
-}
-
-function renderCurrentStock() {
-    const tableBody = document.getElementById("currentStockTable").getElementsByTagName("tbody")[0];
-    tableBody.innerHTML = "";
-
-    inventoryData.forEach(item => {
-        const row = tableBody.insertRow();
         row.insertCell(0).innerText = item.name;
-        row.insertCell(1).innerText = item.system;
-        row.insertCell(2).innerText = item.sold;
-        row.insertCell(3).innerText = item.system - item.sold;
+        row.insertCell(1).innerText = item.type;
+
+        const del = row.insertCell(2);
+        del.innerHTML = `<button onclick="deleteMaster(${i})">Delete</button>`;
     });
+}
+
+// 🔹 DELETE MASTER ITEM
+function deleteMaster(i) {
+    masterItems.splice(i, 1);
+    localStorage.setItem(MASTER_KEY, JSON.stringify(masterItems));
+    renderMaster();
+    populateDropdown();
 }
